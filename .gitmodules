@@ -1,0 +1,6 @@
+[submodule "assistant-widget"]
+	path = assistant-widget
+	url = https://github.com/roli2py/assistant-widget.git
+[submodule "assistant-api"]
+	path = assistant-api
+	url = https://github.com/roli2py/assistant-api.git

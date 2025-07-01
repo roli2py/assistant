@@ -1,0 +1,81 @@
+services:
+  proxy:
+    build: ./proxy
+    networks:
+      - proxy-network
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+  
+  frontend:
+    build: ./assistant-widget
+    networks:
+      - backend-network
+      - proxy-network
+    environment:
+      ASSISTANT_BACKEND_TOKEN: "TOKEN"
+      ASSISTANT_BACKEND_PUBLIC_URL: "http://localhost:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build: ./assistant-api
+    networks:
+      - chroma-network
+      - database-network
+      - backend-network
+      - proxy-network
+    environment:
+      OPENAI_API_KEY: "API_KEY"
+    depends_on:
+      database:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+
+  database:
+    image: mysql:8.4.5
+    # If you have a SQL database, paste him in the `mysql` directory, uncomment the commands in the `Dockerfile` and below, and comment a command above
+    # build: ./mysql
+    networks:
+      - database-network
+    environment:
+      MYSQL_ROOT_PASSWORD: "ROOT_PASSWORD"
+      MYSQL_DATABASE: "DATABASE"
+      MYSQL_USER: "USER"
+      MYSQL_PASSWORD: "PASSWORD"
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "$$MYSQL_USER", "--password=$$MYSQL_PASSWORD" ]
+      start_period: 15s
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  chromadb:
+    image: chromadb/chroma:1.0.14.dev72
+    volumes:
+      - chroma-data:/data
+    networks:
+      - chroma-network
+    ports:
+      - "8000:8000"
+
+networks:
+  database-network:
+  backend-network:
+  proxy-network:
+  chroma-network:
+
+volumes:
+  chroma-data:
